@@ -1,0 +1,73 @@
+quarkus:
+  log:
+    console:
+      enable: true
+    level: DEBUG
+  http:
+    port: 8001
+    cors:
+      enabled: true
+    limits:
+      max-body-size: 2M
+    root-path: /api
+  datasource:
+    db-kind: h2
+    jdbc:
+      url: "jdbc:h2:mem:bulkpayments;DB_CLOSE_DELAY=-1"
+  hibernate-orm:
+    schema-management:
+      strategy: drop-and-create
+  smallrye-openapi:
+    path: /openapi
+  swagger-ui:
+    always-include: true
+  rest-client:
+    # Sandbox BBVA para /api/bulk-payments (proxy). Sin reintentos: el POST no es idempotente.
+    bbva-bulk-payments:
+      url: https://sbx.pe.bbvaapimarket.com/pe/bulk-payments/v1
+      # 4xx/5xx vuelven como Response para reenviarlos tal cual.
+      disable-default-mapper: true
+      trust-all: true
+      connect-timeout: 5000
+      read-timeout: 30000
+    # Token OAuth (client_credentials): BbvaTokenProvider lo pide y lo cachea hasta 60 s antes de que venza.
+    bbva-oauth:
+      url: https://sbx.pe.bbvaapimarket.com/auth/oauth/v2
+      disable-default-mapper: true
+      trust-all: true
+      connect-timeout: 5000
+      read-timeout: 10000
+
+# El contrato de /api/bulk-payments está en META-INF/openapi.yaml; no generarlo también desde el código.
+mp:
+  openapi:
+    scan:
+      exclude:
+        classes: com.portal.bulkpayments.resource.BulkPaymentsResource
+
+# Credenciales solo por variables de entorno (nunca valores reales aquí).
+# private-key: base64 del PEM PKCS#8 con el que BbvaRequestSigner firma cada petición.
+bbva:
+  auth:
+    client-id: ${BBVA_CLIENT_ID:}
+    client-secret: ${BBVA_CLIENT_SECRET:}
+    private-key: ${BBVA_PRIVATE_KEY_BASE64:}
+
+# Tests: BBVA se simula con FakeBbvaResource/FakeBbvaOAuthResource; la clave la genera BbvaTestKeyResource.
+"%test":
+  quarkus:
+    rest-client:
+      bbva-bulk-payments:
+        url: http://localhost:${quarkus.http.test-port:8081}${quarkus.http.root-path:}/fake-bbva/pe/bulk-payments/v1
+        read-timeout: 1000
+      bbva-oauth:
+        url: http://localhost:${quarkus.http.test-port:8081}${quarkus.http.root-path:}/fake-bbva/auth/oauth/v2
+  mp:
+    openapi:
+      scan:
+        exclude:
+          classes: com.portal.bulkpayments.resource.BulkPaymentsResource,com.portal.bulkpayments.FakeBbvaResource,com.portal.bulkpayments.FakeBbvaOAuthResource
+  bbva:
+    auth:
+      client-id: test-client
+      client-secret: test-secret

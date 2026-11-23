@@ -1,0 +1,448 @@
+openapi: 3.0.3
+info:
+  title: Bulk Payments Service
+  version: 1.0.0
+  description: |
+    `/api/bulk-payments` es un proxy a la API de pagos masivos del sandbox BBVA
+    (`https://sbx.pe.bbvaapimarket.com/pe/bulk-payments/v1`).
+
+    - El servicio agrega las cabeceras `Authorization`, `Digest`, `Signature`, `Date` y `Host`; el cliente no las envía.
+      `Authorization` lleva un token OAuth (client_credentials) que el servicio obtiene con `BBVA_CLIENT_ID` y
+      `BBVA_CLIENT_SECRET` y cachea hasta 60 s antes de que venza. `Digest` (SHA-512 del cuerpo) y `Signature`
+      (RSA-SHA512 sobre `(request-target) host date digest`, con la clave de `BBVA_PRIVATE_KEY_BASE64`) se calculan en cada llamada.
+    - No hay validación local: BBVA valida y su status, cuerpo y `Location` se devuelven tal cual.
+    - Errores propios del proxy: `502 upstreamUnavailable`, `502 upstreamAuthFailed` (no se obtuvo el token o no se pudo firmar) y `504 upstreamTimeout`.
+
+    Flujo: crear la remesa (POST), agregar pagos (PATCH) y liquidarla (closing-settlement).
+
+    Este archivo es la fuente de verdad del contrato de bulk-payments. `/api/bulk-payments-deferred-signature`
+    se documenta automáticamente desde su recurso.
+servers:
+  - url: http://localhost:4001
+tags:
+  - name: bulk-payments
+    description: Proxy al sandbox BBVA de pagos masivos.
+
+paths:
+  /api/bulk-payments/remittance:
+    post:
+      tags: [bulk-payments]
+      operationId: createRemittance
+      summary: Crear una remesa
+      description: Crea la remesa en BBVA con un primer lote de pagos. El header declara los totales finales de la remesa.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BbvaCreateRemittanceRequest'
+            example:
+              name: Agregar varios pagos soles
+              header:
+                numberOfTransactions: 4
+                controlSum:
+                  - amount: 12000
+                    currency: PEN
+              status: DRAFT
+              remittances:
+                - instructionId: DD43-ID
+                  debtor:
+                    identity:
+                      id: '20600380533'
+                      documentType: RUC
+                  debtorName: JV PERFORACIONES EIRL
+                  debtorAccount:
+                    numberType: CCC
+                    number: '001101300105109811'
+                  payments:
+                    - endToEndId: PAGO 1
+                      paymentAmount:
+                        currency: PEN
+                        amount: 3000
+                      creditor:
+                        name: Adam Fulton
+                        identity:
+                          id: '21211232'
+                          documentType: DNI
+                      creditorAccount:
+                        numberType: CCC
+                        number: '001108140100035281'
+                      paymentType: INTERNAL_PAYMENT
+                    - endToEndId: PAGO 2
+                      paymentAmount:
+                        currency: PEN
+                        amount: 3000
+                      creditor:
+                        name: Adam Fulton
+                        identity:
+                          id: '34211223'
+                          documentType: DNI
+                      creditorAccount:
+                        numberType: CCC
+                        number: '001108140100026177'
+                      paymentType: INTERNAL_PAYMENT
+      responses:
+        '201':
+          description: Remesa creada.
+          headers:
+            Location:
+              description: Ruta de la remesa en BBVA; el último segmento es el id para PATCH y closing-settlement.
+              schema:
+                type: string
+                example: /pe/bulk-payments/v1/remittances/298C13EF76A846218677DB7931E6EB00
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BbvaRemittanceCreatedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+
+  /api/bulk-payments/remittances/{id}:
+    patch:
+      tags: [bulk-payments]
+      operationId: addPayments
+      summary: Agregar pagos a una remesa
+      description: Agrega pagos a una remesa existente. `status` CLOSED indica que no se agregarán más pagos.
+      parameters:
+        - $ref: '#/components/parameters/RemittanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BbvaAddPaymentsRequest'
+            example:
+              header:
+                numberOfTransactions: 4
+                controlSum:
+                  - amount: 12000
+                    currency: PEN
+              status: CLOSED
+              remittances:
+                - instructionId: DD43-ID
+                  debtorAccount:
+                    numberType: CCC
+                    number: '001101300105109811'
+                  payments:
+                    - endToEndId: Pago 3
+                      paymentAmount:
+                        currency: PEN
+                        amount: 3000
+                      creditor:
+                        name: Jacqueline Jackson
+                        identity:
+                          id: '20234323332'
+                          documentType: RUC
+                      creditorAccount:
+                        numberType: CCC
+                        number: '001101300210477311'
+                      paymentType: INTERNAL_PAYMENT
+                    - endToEndId: Pago 4
+                      paymentAmount:
+                        currency: PEN
+                        amount: 3000
+                      creditor:
+                        name: Joel Jackson
+                        identity:
+                          id: '20002954901'
+                          documentType: RUC
+                      creditorAccount:
+                        numberType: CCC
+                        number: '001108140100016740'
+                      paymentType: INTERNAL_PAYMENT
+      responses:
+        '204':
+          description: Pagos agregados.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+
+  /api/bulk-payments/remittances/{id}/closing-settlement:
+    post:
+      tags: [bulk-payments]
+      operationId: closingSettlement
+      summary: Liquidar una remesa
+      description: Liquida la remesa. La cuenta de cargo debe coincidir con la informada al crearla.
+      parameters:
+        - $ref: '#/components/parameters/RemittanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BbvaClosingSettlementRequest'
+            example:
+              remittances:
+                - debtorAccount:
+                    number: '001101300105109811'
+      responses:
+        '204':
+          description: Remesa liquidada.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+        '504':
+          $ref: '#/components/responses/GatewayTimeout'
+
+components:
+  parameters:
+    RemittanceId:
+      name: id
+      in: path
+      required: true
+      description: Id de la remesa (último segmento del `Location` devuelto al crearla).
+      schema:
+        type: string
+        example: 298C13EF76A846218677DB7931E6EB00
+
+  responses:
+    BadRequest:
+      description: Error de validación o de negocio devuelto por BBVA, sin cambios.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BbvaErrorResponse'
+          example:
+            messages:
+              - code: totalRegistersNotMatch
+                message: There is a difference between the total number of records reported.
+                type: ERROR
+    Unauthorized:
+      description: BBVA rechazó el token. Cuerpo tal cual lo devuelve BBVA; el servicio descarta el token cacheado y pide otro en la siguiente llamada.
+    BadGateway:
+      description: No se pudo conectar con BBVA (`upstreamUnavailable`) o no se obtuvo el token OAuth (`upstreamAuthFailed`).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BbvaErrorResponse'
+          examples:
+            upstreamUnavailable:
+              value:
+                messages:
+                  - code: upstreamUnavailable
+                    message: No se pudo conectar con BBVA.
+                    type: ERROR
+            upstreamAuthFailed:
+              value:
+                messages:
+                  - code: upstreamAuthFailed
+                    message: No se pudo obtener el token de BBVA.
+                    type: ERROR
+    GatewayTimeout:
+      description: BBVA no respondió dentro del tiempo de lectura (30 s).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BbvaErrorResponse'
+          example:
+            messages:
+              - code: upstreamTimeout
+                message: BBVA no respondió a tiempo.
+                type: ERROR
+
+  schemas:
+    BbvaCreateRemittanceRequest:
+      type: object
+      required: [name, status, header, remittances]
+      properties:
+        name:
+          type: string
+          description: Nombre de la remesa.
+          example: Agregar varios pagos soles
+        status:
+          $ref: '#/components/schemas/BbvaRemittanceStatus'
+        header:
+          $ref: '#/components/schemas/BbvaHeader'
+        remittances:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/BbvaRemittance'
+
+    BbvaAddPaymentsRequest:
+      type: object
+      required: [status, header, remittances]
+      properties:
+        name:
+          type: string
+          description: Opcional al agregar pagos.
+        status:
+          $ref: '#/components/schemas/BbvaRemittanceStatus'
+        header:
+          $ref: '#/components/schemas/BbvaHeader'
+        remittances:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/BbvaRemittance'
+
+    BbvaClosingSettlementRequest:
+      type: object
+      required: [remittances]
+      properties:
+        remittances:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [debtorAccount]
+            properties:
+              debtorAccount:
+                $ref: '#/components/schemas/BbvaAccount'
+
+    BbvaRemittanceStatus:
+      type: string
+      enum: [DRAFT, CLOSED]
+      description: DRAFT mientras se agregan pagos; CLOSED cuando la remesa está completa.
+
+    BbvaHeader:
+      type: object
+      required: [numberOfTransactions, controlSum]
+      description: Totales **finales** de la remesa (todos los pagos, incluidos los que se agregarán por PATCH), no solo los del request.
+      properties:
+        numberOfTransactions:
+          type: integer
+          minimum: 1
+          example: 4
+        controlSum:
+          type: array
+          description: Suma de montos por moneda.
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/BbvaAmount'
+
+    BbvaRemittance:
+      type: object
+      required: [instructionId, debtorAccount, payments]
+      properties:
+        instructionId:
+          type: string
+          example: DD43-ID
+        debtor:
+          type: object
+          description: Ordenante. Se informa al crear la remesa.
+          properties:
+            identity:
+              $ref: '#/components/schemas/BbvaIdentity'
+        debtorName:
+          type: string
+          example: JV PERFORACIONES EIRL
+        debtorAccount:
+          $ref: '#/components/schemas/BbvaAccount'
+        payments:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/BbvaPayment'
+
+    BbvaPayment:
+      type: object
+      required: [paymentType, paymentAmount, creditor, creditorAccount]
+      properties:
+        endToEndId:
+          type: string
+          description: Referencia del pago.
+          example: PAGO 1
+        paymentType:
+          type: string
+          enum: [INTERNAL_PAYMENT, INTERBANK_PAYMENT]
+        paymentAmount:
+          $ref: '#/components/schemas/BbvaAmount'
+        creditor:
+          $ref: '#/components/schemas/BbvaParty'
+        creditorAccount:
+          $ref: '#/components/schemas/BbvaAccount'
+
+    BbvaParty:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Adam Fulton
+        identity:
+          $ref: '#/components/schemas/BbvaIdentity'
+
+    BbvaIdentity:
+      type: object
+      required: [id, documentType]
+      properties:
+        id:
+          type: string
+          example: '20600380533'
+        documentType:
+          type: string
+          example: RUC
+          description: Tipo de documento, por ejemplo RUC o DNI.
+
+    BbvaAccount:
+      type: object
+      required: [number]
+      properties:
+        numberType:
+          type: string
+          example: CCC
+        number:
+          type: string
+          example: '001101300105109811'
+
+    BbvaAmount:
+      type: object
+      required: [currency, amount]
+      properties:
+        currency:
+          type: string
+          example: PEN
+        amount:
+          type: number
+          example: 3000
+
+    BbvaRemittanceCreatedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              example: 298C13EF76A846218677DB7931E6EB00
+            name:
+              type: string
+            header:
+              $ref: '#/components/schemas/BbvaHeader'
+            status:
+              $ref: '#/components/schemas/BbvaRemittanceStatus'
+            remittances:
+              type: array
+              items:
+                $ref: '#/components/schemas/BbvaRemittance'
+
+    BbvaErrorResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+              type:
+                type: string
+                enum: [ERROR]
