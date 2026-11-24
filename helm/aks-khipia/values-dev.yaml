@@ -1,0 +1,3 @@
+# Overrides para dev (usado por CHART_OVERRIDE_PATH en el workflow).
+env:
+  QUARKUS_LOG_LEVEL: INFO

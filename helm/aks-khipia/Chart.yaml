@@ -1,0 +1,6 @@
+apiVersion: v2
+name: aks-khipia
+description: bulk-payments-service (Quarkus) en AKS
+type: application
+version: 0.1.0
+appVersion: "1.0.0-SNAPSHOT"

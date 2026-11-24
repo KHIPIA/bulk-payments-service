@@ -1,0 +1,35 @@
+# Valores por defecto. values-dev.yaml los sobrescribe por entorno.
+
+# Ojo: deferred-signature guarda los datos en H2 en memoria por pod.
+# Con más de 1 réplica una remesa creada en un pod no existe en los otros.
+replicas: 1
+
+image:
+  # Debe coincidir con la imagen que el workflow pasa a k8s-deploy (`images:`),
+  # que reemplaza el tag por el SHA del commit.
+  repository: acrkhipiadev8f42de.azurecr.io/aks-khipia-dev
+  tag: latest
+  pullPolicy: IfNotPresent
+
+containerPort: 8001
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Secret de Kubernetes con las credenciales BBVA (se crea fuera del chart, nunca en Git).
+# Claves esperadas: BBVA_CLIENT_ID, BBVA_CLIENT_SECRET, BBVA_PRIVATE_KEY_BASE64.
+# Es opcional: sin él el pod arranca y deferred-signature funciona, pero el proxy devuelve 502.
+bbvaSecretName: bbva-credentials
+
+javaOpts: "-XX:MaxRAMPercentage=75.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+
+# Variables de entorno extra (p. ej. QUARKUS_LOG_LEVEL: INFO).
+env: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
