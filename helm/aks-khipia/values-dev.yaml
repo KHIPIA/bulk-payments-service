@@ -5,6 +5,6 @@ env:
 bbvaSecretName: bbva-credentials
 
 keyVault:
-  name: "kv-khipia-dev"
+  name: "kv-khipia-dev-8f42d"
   tenantId: "27c2a1f4-bf84-4004-972b-1d7135a74a17"
   identityClientId: "055e72ad-a582-49dc-96d1-b5ce84745315"   # no es secreto
