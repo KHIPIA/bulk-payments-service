@@ -1,5 +1,8 @@
 # Valores por defecto. values-dev.yaml los sobrescribe por entorno.
 
+# Nombre del Deployment, Service, contenedor y etiquetas (por defecto, el nombre del chart).
+nameOverride: bulk-payments-service
+
 # Ojo: deferred-signature guarda los datos en H2 en memoria por pod.
 # Con más de 1 réplica una remesa creada en un pod no existe en los otros.
 replicas: 1
