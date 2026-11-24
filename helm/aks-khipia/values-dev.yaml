@@ -1,3 +1,10 @@
 # Overrides para dev (usado por CHART_OVERRIDE_PATH en el workflow).
 env:
   QUARKUS_LOG_LEVEL: INFO
+
+bbvaSecretName: bbva-credentials
+
+keyVault:
+  name: "kv-khipia-dev"
+  tenantId: "27c2a1f4-bf84-4004-972b-1d7135a74a17"
+  identityClientId: "055e72ad-a582-49dc-96d1-b5ce84745315"   # no es secreto

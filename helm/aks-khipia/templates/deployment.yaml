@@ -13,7 +13,9 @@ spec:
     metadata:
       labels:
         {{- include "aks-khipia.selectorLabels" . | nindent 8 }}
+        azure.workload.identity/use: "true"                      # NUEVO (a)
     spec:
+      serviceAccountName: {{ include "aks-khipia.name" . }}      # NUEVO (b)
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
@@ -39,6 +41,10 @@ spec:
             - name: {{ $name }}
               value: {{ $value | quote }}
             {{- end }}
+          volumeMounts:                                          # NUEVO (c)
+            - name: kv-secrets
+              mountPath: /mnt/secrets-store
+              readOnly: true
           # quarkus.http.root-path=/api, así que health queda bajo /api/q/health.
           startupProbe:
             httpGet:
@@ -58,3 +64,10 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:                                                   # NUEVO (d)
+        - name: kv-secrets
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ include "aks-khipia.name" . }}-kv

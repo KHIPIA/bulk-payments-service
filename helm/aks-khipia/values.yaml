@@ -25,6 +25,12 @@ service:
 # Es opcional: sin él el pod arranca y deferred-signature funciona, pero el proxy devuelve 502.
 bbvaSecretName: bbva-credentials
 
+# Acceso a Key Vault vía Workload Identity (valores por entorno en values-<env>.yaml).
+keyVault:
+  name: "kv-khipia-dev"
+  tenantId: "27c2a1f4-bf84-4004-972b-1d7135a74a17"
+  identityClientId: "055e72ad-a582-49dc-96d1-b5ce84745315"
+
 javaOpts: "-XX:MaxRAMPercentage=75.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 
 # Variables de entorno extra (p. ej. QUARKUS_LOG_LEVEL: INFO).
