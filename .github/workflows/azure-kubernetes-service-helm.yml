@@ -39,13 +39,17 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+permissions:
+  id-token: write   # obligatorio para OIDC
+  contents: read
+
 env:
-  AZURE_CONTAINER_REGISTRY: "your-azure-container-registry"
-  CONTAINER_NAME: "your-container-name"
-  RESOURCE_GROUP: "your-resource-group"
-  CLUSTER_NAME: "your-cluster-name"
-  CHART_PATH: "your-chart-path"
-  CHART_OVERRIDE_PATH: "your-chart-override-path"
+  AZURE_CONTAINER_REGISTRY: "acrkhipiadev8f42de"
+  CONTAINER_NAME: "aks-khipia-dev"
+  RESOURCE_GROUP: "RG-KHIPIA"
+  CLUSTER_NAME: "aks-khipia-dev"
+  CHART_PATH: "./helm/aks-khipia"
+  CHART_OVERRIDE_PATH: "./helm/aks-khipia/values-dev.yaml"
 
 jobs:
   buildImage:
