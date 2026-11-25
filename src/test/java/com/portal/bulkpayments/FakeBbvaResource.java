@@ -53,8 +53,7 @@ public class FakeBbvaResource {
           .build();
     }
     return Response.status(201)
-        .header("Location", "/pe/bulk-payments/v1/remittances/" + ID)
-        .entity("{\"data\":{\"id\":\"" + ID + "\",\"name\":" + body.path("name") + ",\"status\":\"DRAFT\"}}")
+        .header("Location", "/pe/bulk-payments/v1/remittances/" + ID) // como el sandbox real: sin cuerpo
         .build();
   }
 

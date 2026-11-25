@@ -66,8 +66,9 @@ class BulkPaymentsResourceTest {
         .then()
         .statusCode(201)
         .header("Location", "/pe/bulk-payments/v1/remittances/" + FakeBbvaResource.ID)
-        .body("data.id", equalTo(FakeBbvaResource.ID))
-        .body("data.name", equalTo("Agregar varios pagos soles"));
+        .body("httpCode", equalTo(201))
+        .body("message", equalTo("Remesa creada correctamente."))
+        .body("id", equalTo(FakeBbvaResource.ID));
 
     assertEquals("/remittance", FakeBbvaResource.lastPath);
     // Campos que los DTO locales no modelan llegan intactos.
@@ -90,7 +91,7 @@ class BulkPaymentsResourceTest {
   @Test
   void patchIsSignedWithItsMethodAndPath() throws Exception {
     given().contentType(ContentType.JSON).body(PATCH)
-        .when().patch(BASE + "/remittances/" + FakeBbvaResource.ID).then().statusCode(204);
+        .when().patch(BASE + "/remittances/" + FakeBbvaResource.ID).then().statusCode(200);
     assertSigned("patch", "/remittances/" + FakeBbvaResource.ID, FakeBbvaResource.lastHeaders);
   }
 
@@ -144,19 +145,23 @@ class BulkPaymentsResourceTest {
   }
 
   @Test
-  void patchIsForwardedAndReturns204() {
+  void patchIsForwardedAndReturns200WithMessage() {
     given().contentType(ContentType.JSON).body(PATCH)
         .when().patch(BASE + "/remittances/" + FakeBbvaResource.ID)
-        .then().statusCode(204);
+        .then().statusCode(200)
+        .body("httpCode", equalTo(200))
+        .body("message", equalTo("Pagos agregados correctamente."));
     assertEquals("/remittances/" + FakeBbvaResource.ID, FakeBbvaResource.lastPath);
     assertEquals("CLOSED", FakeBbvaResource.lastBody.path("status").asText());
   }
 
   @Test
-  void closingSettlementIsForwardedAndReturns204() {
+  void closingSettlementIsForwardedAndReturns200WithMessage() {
     given().contentType(ContentType.JSON).body(CLOSE)
         .when().post(BASE + "/remittances/" + FakeBbvaResource.ID + "/closing-settlement")
-        .then().statusCode(204);
+        .then().statusCode(200)
+        .body("httpCode", equalTo(200))
+        .body("message", equalTo("Remesa liquidada correctamente."));
     assertEquals("/remittances/" + FakeBbvaResource.ID + "/closing-settlement", FakeBbvaResource.lastPath);
   }
 

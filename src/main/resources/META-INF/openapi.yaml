@@ -93,7 +93,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BbvaRemittanceCreatedResponse'
+                $ref: '#/components/schemas/BbvaProxySuccessResponse'
+              example:
+                httpCode: 201
+                message: Remesa creada correctamente.
+                id: 298C13EF76A846218677DB7931E6EB00
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -157,8 +161,15 @@ paths:
                         number: '001108140100016740'
                       paymentType: INTERNAL_PAYMENT
       responses:
-        '204':
-          description: Pagos agregados.
+        '200':
+          description: Pagos agregados (BBVA responde 204; el proxy agrega el mensaje).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BbvaProxySuccessResponse'
+              example:
+                httpCode: 200
+                message: Pagos agregados correctamente.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -187,8 +198,15 @@ paths:
                 - debtorAccount:
                     number: '001101300105109811'
       responses:
-        '204':
-          description: Remesa liquidada.
+        '200':
+          description: Remesa liquidada (BBVA responde 204; el proxy agrega el mensaje).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BbvaProxySuccessResponse'
+              example:
+                httpCode: 200
+                message: Remesa liquidada correctamente.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -411,26 +429,21 @@ components:
           type: number
           example: 3000
 
-    BbvaRemittanceCreatedResponse:
+    BbvaProxySuccessResponse:
       type: object
+      description: Lo agrega el proxy cuando BBVA responde 2xx sin cuerpo.
+      required: [httpCode, message]
       properties:
-        data:
-          type: object
-          properties:
-            id:
-              type: string
-              example: 298C13EF76A846218677DB7931E6EB00
-            name:
-              type: string
-            header:
-              $ref: '#/components/schemas/BbvaHeader'
-            status:
-              $ref: '#/components/schemas/BbvaRemittanceStatus'
-            remittances:
-              type: array
-              items:
-                $ref: '#/components/schemas/BbvaRemittance'
-
+        httpCode:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Remesa creada correctamente.
+        id:
+          type: string
+          description: Id de la remesa (último segmento de Location). Solo al crear.
+          example: 298C13EF76A846218677DB7931E6EB00
     BbvaErrorResponse:
       type: object
       properties:
