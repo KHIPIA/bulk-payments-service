@@ -36,6 +36,12 @@ javaOpts: "-XX:MaxRAMPercentage=75.0 -Djava.util.logging.manager=org.jboss.logma
 # Variables de entorno extra (p. ej. QUARKUS_LOG_LEVEL: INFO).
 env: {}
 
+route:
+  enabled: true
+  gatewayName: internal-gateway
+  gatewayNamespace: gateway
+  pathPrefix: /bulk-payments
+
 resources:
   requests:
     cpu: 100m

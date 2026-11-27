@@ -4,6 +4,12 @@ env:
 
 bbvaSecretName: bbva-credentials
 
+route:
+  enabled: true
+  gatewayName: internal-gateway
+  gatewayNamespace: gateway
+  pathPrefix: /bulk-payments
+
 keyVault:
   name: "kv-khipia-dev-8f42d"
   tenantId: "27c2a1f4-bf84-4004-972b-1d7135a74a17"
